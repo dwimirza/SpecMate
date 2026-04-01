@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 datasource db {
   provider = "mysql"
 }
@@ -11,26 +6,79 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model CPU {
+  id         Int      @id @default(autoincrement())
+  brand      String
+  model      String
+  slug       String   @unique
+  benchmark  Int?
+  singleCore Int?
+  laptops    Laptop[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([brand, model])
+}
+
+model GPU {
+  id         Int      @id @default(autoincrement())
+  brand      String
+  model      String
+  slug       String   @unique
+  benchmark  Int?
+  laptops    Laptop[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([brand, model])
+}
+
 model Phone {
-  id          Int     @id @default(autoincrement())
-  brand       String
-  model       String
-  soc         String?   // chipset / CPU
-  ramGb       Int?
-  storageGb   Int?
-  batteryMah  Int?
-  benchmark   Int?      // AnTuTu / Geekbench approximated
-  priceIdr    Int?
+  id                  Int      @id @default(autoincrement())
+  brand               String
+  model               String
+  slug                String   @unique
+  soc                 String?
+  ramGb               Int?
+  storageGb           Int?
+  batteryMah          Int?
+  batteryHours        Float?
+  benchmark           Int?
+  priceIdr            Int?
+  screenSizeInch      Float?
+  screenResolutionX   Int?
+  screenResolutionY   Int?
+  screenPanelType     String?
+  screenRefreshRateHz Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([brand, model])
 }
 
 model Laptop {
-  id          Int     @id @default(autoincrement())
-  brand       String
-  model       String
-  cpu         String?
-  gpu         String?
-  ramGb       Int?
-  storageGb   Int?
-  benchmark   Int?      // PassMark / Cinebench
-  priceIdr    Int?
+  id                  Int      @id @default(autoincrement())
+  brand               String
+  model               String
+  slug                String   @unique
+  cpuId               Int?
+  gpuId               Int?
+  cpu                 CPU?     @relation(fields: [cpuId], references: [id])
+  gpu                 GPU?     @relation(fields: [gpuId], references: [id])
+  ramGb               Int?
+  storageGb           Int?
+  batteryWh           Float?
+  batteryHours        Float?
+  priceIdr            Int?
+  screenSizeInch      Float?
+  screenResolutionX   Int?
+  screenResolutionY   Int?
+  screenPanelType     String?
+  screenRefreshRateHz Int?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([brand, model])
+  @@index([cpuId])
+  @@index([gpuId])
 }
