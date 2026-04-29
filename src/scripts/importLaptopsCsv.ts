@@ -81,6 +81,7 @@ async function main() {
     const batteryHours = null
     const panelType = null
     const refreshRate = null
+    const imageUrl = pick(row, ['image_url']) || null
 
     const priceNum = parseNumber(rawPrice)
     const priceIdr = priceNum ? Math.round(priceNum * INR_TO_IDR) : null
@@ -100,6 +101,7 @@ async function main() {
         batteryWh,
         batteryHours,
         priceIdr,
+        imageUrl,
         screenSizeInch: inches,
         screenResolutionX: resolution.x,
         screenResolutionY: resolution.y,
@@ -117,6 +119,7 @@ async function main() {
         batteryWh,
         batteryHours,
         priceIdr,
+        imageUrl,
         screenSizeInch: inches,
         screenResolutionX: resolution.x,
         screenResolutionY: resolution.y,

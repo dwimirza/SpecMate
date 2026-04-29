@@ -4,7 +4,6 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]  // ← tambah ini
 }
 
 model CPU {
@@ -76,10 +75,11 @@ model Laptop {
   screenResolutionY   Int?
   screenPanelType     String?
   screenRefreshRateHz Int?
+  imageUrl            String?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
   @@unique([brand, model])
   @@index([cpuId])
   @@index([gpuId])
-}
+  }
