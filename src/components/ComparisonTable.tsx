@@ -3,6 +3,13 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Info, ChevronDown, DollarSign, Calculator } from "lucide-react";
+import { 
+  computeProcessingScore, 
+  computeMemoryScore, 
+  computeDisplayScore, 
+  computeBatteryScore, 
+  formatPrice 
+} from "@/lib/scoring";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -43,6 +50,7 @@ export interface LaptopRaw {
     screenResolutionY: number | null;
     screenPanelType: string | null;
     screenRefreshRateHz: number | null;
+    imageUrl?: string | null;
     cpu: { brand: string; model: string } | null;
     gpu: { brand: string; model: string } | null;
 }
@@ -76,79 +84,43 @@ const LAPTOP_SPECS: SpecDef[] = [
     },
 ];
 
-// ─── SCORING LOGIC ────────────────────────────────────────────────────────────
-
-function scoreCpu(name: string): number {
-    const l = name.toLowerCase();
-    if (l.includes("i9") || l.includes("ryzen 9") || l.includes("m3 max") || l.includes("m4 max")) return 95;
-    if (l.includes("i7") || l.includes("ryzen 7") || l.includes("m3 pro") || l.includes("m4 pro")) return 85;
-    if (l.includes("i5") || l.includes("ryzen 5") || l.includes("m3") || l.includes("m4")) return 70;
-    if (l.includes("i3") || l.includes("ryzen 3")) return 50;
-    return 60;
-}
-
-function scoreGpu(name: string): number {
-    const l = name.toLowerCase();
-    if (l.match(/rtx.?(4090|3090|4080)/)) return 95;
-    if (l.match(/rtx.?(4070|3080|7800)/)) return 85;
-    if (l.match(/rtx.?(4060|3070|4050|3060|7700|7600)/)) return 70;
-    if (l.match(/gtx|rtx.?3050|1650|1660/)) return 55;
-    if (l.includes("integrated") || l.includes("uhd") || l.includes("iris") || l.includes("radeon graphics")) return 35;
-    return 40;
-}
+// ─── CONVERT RAW TO LAPTOP ITEM ───────────────────────────────────────────────
 
 function convertToLaptopItem(raw: LaptopRaw): LaptopItem {
-    const rpFormatter = new Intl.NumberFormat("id-ID", {
-        style: "currency",
-        currency: "IDR",
-        maximumFractionDigits: 0,
-    });
-
-    // Processing
     const cpuName = raw.cpu ? `${raw.cpu.brand} ${raw.cpu.model}` : "Unknown CPU";
     const gpuName = raw.gpu ? `${raw.gpu.brand} ${raw.gpu.model}` : "Integrated";
-    const cpuScore = scoreCpu(cpuName);
-    const gpuScore = scoreGpu(gpuName);
-    const procScore = Math.round(cpuScore * 0.6 + gpuScore * 0.4);
 
-    // Memory
-    const ram = raw.ramGb ?? 0;
-    const storage = raw.storageGb ?? 0;
-    const memScore = Math.min(
-        Math.round(Math.min((ram / 32) * 50, 50) + Math.min((storage / 2048) * 50, 50)) + 20,
-        100
+    const procScore = computeProcessingScore(cpuName, gpuName);
+    const memScore = computeMemoryScore(raw.ramGb, raw.storageGb);
+    const dispScore = computeDisplayScore(
+        raw.screenResolutionX,
+        raw.screenResolutionY,
+        raw.screenRefreshRateHz,
+        raw.screenPanelType
     );
+    const battScore = computeBatteryScore(raw.batteryWh, raw.batteryHours);
 
-    // Display
-    let dispScore = 60;
-    let dispDetail = "Info layar tidak tersedia";
+    const priceStr = formatPrice(raw.priceIdr);
+
+    const procValue = procScore > 80 ? "High-End" : procScore > 65 ? "Mid-Range" : "Entry-Level";
+    const memValue = `${raw.ramGb ?? 0}GB / ${raw.storageGb ?? 0}GB`;
     let dispValue = "Unknown";
+    let dispDetail = "Info layar tidak tersedia";
     if (raw.screenResolutionX && raw.screenResolutionY) {
-        dispDetail = `${raw.screenSizeInch ?? "?''"} · ${raw.screenResolutionX}×${raw.screenResolutionY}`;
+        dispValue = `${raw.screenResolutionX}×${raw.screenResolutionY}`;
+        dispDetail = `${raw.screenSizeInch ?? "?"}" · ${raw.screenResolutionX}×${raw.screenResolutionY}`;
         if (raw.screenRefreshRateHz) dispDetail += ` @ ${raw.screenRefreshRateHz}Hz`;
         if (raw.screenPanelType) dispDetail += ` (${raw.screenPanelType})`;
-        dispValue = `${raw.screenResolutionX}×${raw.screenResolutionY}`;
-        if (raw.screenResolutionX >= 3840) dispScore += 25;
-        else if (raw.screenResolutionX >= 2560) dispScore += 20;
-        if (raw.screenRefreshRateHz && raw.screenRefreshRateHz >= 120) dispScore += 15;
-        else if (raw.screenRefreshRateHz && raw.screenRefreshRateHz >= 60) dispScore += 5;
-        if (raw.screenPanelType?.toLowerCase().includes("oled")) dispScore += 10;
-        dispScore = Math.min(dispScore, 100);
     }
-
-    // Battery
-    let battScore = 50;
-    let battDetail = "Unknown Battery";
     let battValue = "N/A";
+    let battDetail = "Battery info not available";
     if (raw.batteryWh) {
-        battDetail = `${raw.batteryWh}Wh`;
         battValue = `${raw.batteryWh}Wh`;
-        battScore = Math.min(100, Math.round((raw.batteryWh / 100) * 100));
+        battDetail = `${raw.batteryWh}Wh`;
     }
     if (raw.batteryHours) {
-        battDetail = `${raw.batteryWh ? `${raw.batteryWh}Wh ` : ""}(~${raw.batteryHours} jam)`;
         battValue = raw.batteryWh ? `${raw.batteryWh}Wh` : `${raw.batteryHours}h`;
-        battScore = Math.min(100, Math.round((raw.batteryHours / 15) * 100));
+        battDetail = `${raw.batteryWh ? `${raw.batteryWh}Wh ` : ""}(~${raw.batteryHours} jam)`;
     }
 
     return {
@@ -156,23 +128,18 @@ function convertToLaptopItem(raw: LaptopRaw): LaptopItem {
         brand: raw.brand,
         name: raw.model.split(" (")[0],
         price: raw.priceIdr ?? 0,
-        priceStr: raw.priceIdr ? rpFormatter.format(raw.priceIdr) : "N/A",
+        priceStr,
+        imageUrl: raw.imageUrl,
         specValues: {
-            processing: {
-                value: procScore > 80 ? "High-End" : procScore > 65 ? "Mid-Range" : "Entry-Level",
-                detail: `${cpuName} + ${gpuName}`,
-                score: procScore,
-            },
-            memory: {
-                value: `${ram}GB / ${storage}GB`,
-                detail: `${ram}GB RAM, ${storage}GB SSD`,
-                score: memScore,
-            },
+            processing: { value: procValue, detail: `${cpuName} + ${gpuName}`, score: procScore },
+            memory: { value: memValue, detail: `${raw.ramGb ?? 0}GB RAM, ${raw.storageGb ?? 0}GB SSD`, score: memScore },
             disp: { value: dispValue, detail: dispDetail, score: dispScore },
             batt: { value: battValue, detail: battDetail, score: battScore },
         },
     };
 }
+
+// ─── VALUE RATING ─────────────────────────────────────────────────────────────
 
 function calculateValueRating(item: LaptopItem): { totalPoints: number; valueScore: number } {
     let totalPoints = 0;
@@ -180,7 +147,7 @@ function calculateValueRating(item: LaptopItem): { totalPoints: number; valueSco
         totalPoints += (item.specValues[spec.id]?.score ?? 0) * spec.weight;
     });
     const multiplier = item.price > 1_000_000 ? 1_000_000 : 10;
-    const valueScore = Math.min((totalPoints / item.price) * multiplier, 100);
+    const valueScore = Math.min((totalPoints / (item.price || 1)) * multiplier, 100);
     return { totalPoints, valueScore };
 }
 
@@ -321,14 +288,20 @@ function WinnerSummary({ itemA, itemB }: { itemA: LaptopItem; itemB: LaptopItem 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 
 interface ComparisonTableProps {
-    laptops: LaptopRaw[];
+  laptops: LaptopRaw[];
+  preselectedIds?: number[];
 }
 
-export default function ComparisonTable({ laptops }: ComparisonTableProps) {
-    const items = laptops.map(convertToLaptopItem);
-
-    const [selectedIdA, setSelectedIdA] = useState<number>(items[0]?.id ?? 0);
-    const [selectedIdB, setSelectedIdB] = useState<number>(items[1]?.id ?? 0);
+export default function ComparisonTable({ laptops, preselectedIds = [] }: ComparisonTableProps) {
+  const items = laptops.map(convertToLaptopItem);
+  const [selectedIdA, setSelectedIdA] = useState<number>(() => {
+    if (preselectedIds[0] && items.find(i => i.id === preselectedIds[0])) return preselectedIds[0];
+    return items[0]?.id ?? 0;
+  });
+  const [selectedIdB, setSelectedIdB] = useState<number>(() => {
+    if (preselectedIds[1] && items.find(i => i.id === preselectedIds[1])) return preselectedIds[1];
+    return items[1]?.id ?? 0;
+  });
 
     const itemA = items.find((l) => l.id === selectedIdA);
     const itemB = items.find((l) => l.id === selectedIdB);
